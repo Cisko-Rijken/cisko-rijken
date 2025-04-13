@@ -1,94 +1,254 @@
 <!DOCTYPE html>
 <html>
 <head>
-<script src="js/three.min.js"></script>
-<script src="js/OrbitControls.js"></script>
-<script src="js/OBJLoader.js"></script>
+    <title>Three.js OBJ Loader Debug</title>
+    <script src="js/three.min.js"></script>
+    <script src="js/OrbitControls.js"></script>
+    <script src="js/OBJLoader.js"></script>
+    <style>
+        /* Basic CSS reset */
+        body { margin: 0; padding: 0; overflow: hidden; }
+        canvas { display: block; } /* Prevent potential scrollbars */
+    </style>
 </head>
-<body style="margin: 0; padding:0">
+<body>
 <script>
-var scene;
-var camera;
-var renderer;
-var cameraControl;
+    // Declare variables in the global scope
+    var scene;
+    var camera;
+    var renderer;
+    var cameraControl;
 
 
-function createRenderer() {
-  renderer = new THREE.WebGLRenderer();
-  renderer.setClearColor(0x000000, 1,0);
-  renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
-  }
-
-function createCamera() {
-  camera = new THREE.PerspectiveCamera(
-    45,
-    window.innerWidth / window.innerHeight,
-    0.1, 1000);
-    camera.position.x = 15;
-    camera.position.y = 16;
-    camera.position.z = 23;
-    camera.lookAt(scene.position);
-    cameraControl = new THREE.OrbitControls(camera);
-    
-}
+    // --- Initialization Function ---
+    function init() {
+        console.log("Initializing scene..."); // Log: Check if init starts
 
 
-function createLight() {
-
-var spotLight = new THREE.SpotLight(0xffffff);
-spotLight.position.set(10,20,140);
-spotLight.shadowCameraNear = 20;
-spotLight.shadowCameraFar = 50;
-spotLight.castShadow = true;
-scene.add(spotLight);
-}
-
-function loadModel() {
-  var material = new THREE.MeshPhongMaterial({
-    specular: 0x222222,
-    shininess: 35
-  });
-  var loader = new THREE.OBJLoader();
-  loader.load('assets/mesh.obj', function(object){
-  object.traverse(function(child){
-if (child instanceof THREE.Mesh){
-
-  child.material = material;
-  child.position.y -= 10;
-}
-  });
-scene.add(object);
-
-  });
-}
+        // Create the main scene object
+        scene = new THREE.Scene();
 
 
-function init() {
-
-scene = new THREE.Scene();
-
-createRenderer();
-createCamera();
-createLight();
-
-loadModel();
+        // Setup renderer
+        createRenderer();
 
 
-document.body.appendChild(renderer.domElement);
+        // Setup camera and controls
+        createCamera(); // Needs scene to exist for camera.lookAt
 
-render();
-}
 
-function render() {
+        // Setup lights
+        createLight();
 
-cameraControl.update();
 
-  renderer.render(scene, camera);
-  requestAnimationFrame(render);
-}
+        // Load the 3D model
+        loadModel(); // Check console for logs from this function
 
-init();
+
+        // Add the renderer's canvas element to the page
+        document.body.appendChild(renderer.domElement);
+
+
+        // Add event listener for window resizing
+        window.addEventListener('resize', onWindowResize, false);
+
+
+        // Start the rendering loop
+        render();
+        console.log("Initialization complete, starting render loop."); // Log: Check if init finishes
+    }
+
+
+    // --- Renderer Setup ---
+    function createRenderer() {
+        renderer = new THREE.WebGLRenderer({ antialias: true }); // Enable antialiasing for smoother edges
+        // Set clear color to black (0x000000)
+        renderer.setClearColor(0x000000, 1.0); // Corrected alpha value format
+        // Set renderer size to full window
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        // Enable shadow mapping
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadows (optional)
+        console.log("Renderer created."); // Log: Confirm renderer setup
+    }
+
+
+    // --- Camera Setup ---
+    function createCamera() {
+        // Create a perspective camera
+        camera = new THREE.PerspectiveCamera(
+            45, // Field of view
+            window.innerWidth / window.innerHeight, // Aspect ratio
+            0.1, // Near clipping plane
+            1000 // Far clipping plane
+        );
+        // Set camera position
+        camera.position.set(15, 16, 23); // Using .set for clarity
+        // Make the camera look at the center of the scene
+        camera.lookAt(scene.position); // scene needs to be defined before calling this
+
+
+        // Add orbit controls to allow mouse interaction
+        // OrbitControls needs the camera and the DOM element to listen to
+        cameraControl = new THREE.OrbitControls(camera, renderer.domElement);
+        cameraControl.enableDamping = true; // Optional: adds inertia to camera movement
+        cameraControl.dampingFactor = 0.25;
+        console.log("Camera and controls created."); // Log: Confirm camera setup
+    }
+
+
+    // --- Lighting Setup ---
+    function createLight() {
+        // Add a spotlight
+        var spotLight = new THREE.SpotLight(0xffffff, 1.0); // White light, default intensity
+        spotLight.position.set(10, 20, 40);
+        spotLight.angle = Math.PI / 6; // Set spotlight angle (adjust as needed)
+        spotLight.penumbra = 0.1; // Softness of the spotlight edge
+        spotLight.decay = 1; // How light intensity falls off with distance
+        spotLight.distance = 100; // Maximum range of the light
+
+
+        // Configure shadow properties
+        spotLight.castShadow = true;
+        spotLight.shadow.mapSize.width = 1024; // Shadow map resolution
+        spotLight.shadow.mapSize.height = 1024;
+        // Adjust shadow camera frustum (these might need tuning based on your scene size)
+        spotLight.shadow.camera.near = 10; // Original: 20
+        spotLight.shadow.camera.far = 80;  // Original: 50 - Increased range slightly
+        spotLight.shadow.camera.fov = 30;
+
+
+        scene.add(spotLight);
+
+
+        // *** DEBUGGING ADDITION: Add Ambient Light ***
+        // This provides some general illumination, ensuring objects aren't
+        // completely black even if they aren't hit directly by the spotlight.
+        var ambientLight = new THREE.AmbientLight(0x404040); // Soft white ambient light
+        scene.add(ambientLight);
+
+
+        console.log("Lights created (Spotlight and Ambient)."); // Log: Confirm light setup
+    }
+
+
+    // --- Model Loading ---
+    function loadModel() {
+        console.log("Attempting to load OBJ model..."); // Log: Start loading
+
+
+        // Create a material for the model
+        var material = new THREE.MeshPhongMaterial({
+            color: 0xffffff, // Explicitly set color to white (default)
+            specular: 0x222222,
+            shininess: 35
+            // side: THREE.DoubleSide // Useful if model faces might be inverted
+        });
+
+
+        // Instantiate the OBJ loader
+        var loader = new THREE.OBJLoader();
+
+
+        // Path to your OBJ file - **VERIFY THIS PATH IS CORRECT**
+        const modelPath = 'assets/mesh.obj';
+        console.log(`Loading model from: ${modelPath}`); // Log: Show the path being used
+
+
+        // Load the OBJ file
+        loader.load(
+            modelPath,
+            // *** onLoad Callback (Success) ***
+            function ( object ) {
+                console.log("OBJ Model Loaded Successfully:", object); // Log: Success and show object structure
+
+
+                // Traverse the loaded object hierarchy
+                object.traverse(function(child){
+                    // Check if the child is a mesh
+                    if (child instanceof THREE.Mesh){
+                        console.log("Applying material and settings to mesh:", child.name); // Log: Identify mesh being processed
+                        // Apply the created material
+                        child.material = material;
+                        // Adjust position (consider if this offset is correct for your model)
+                        child.position.y -= 10;
+                        // Enable shadows for this mesh
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                    }
+                });
+
+
+                // Add the loaded object (including its meshes) to the scene
+                scene.add(object);
+                console.log("Model added to the scene."); // Log: Confirm model added
+            },
+            // *** onProgress Callback (Optional) ***
+            function ( xhr ) {
+                // Log loading progress
+                if (xhr.lengthComputable) {
+                    console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+                } else {
+                    console.log( `Loaded ${xhr.loaded} bytes`);
+                }
+            },
+            // *** onError Callback (Failure) ***
+            // THIS IS CRUCIAL FOR DEBUGGING LOADING ISSUES
+            function ( error ) {
+                console.error( 'An error happened during OBJ loading:', error );
+                alert("Error loading OBJ model. Check console (F12) for details."); // Alert user
+            }
+        );
+    }
+
+
+    // --- Render Loop ---
+    function render() {
+        // Request the next frame
+        requestAnimationFrame(render);
+
+
+        // Update camera controls (needed for damping/auto-rotate)
+        cameraControl.update();
+
+
+        // Render the scene from the perspective of the camera
+        renderer.render(scene, camera);
+    }
+
+
+    // --- Handle Window Resize ---
+    function onWindowResize() {
+        // Update camera aspect ratio
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+
+
+        // Update renderer size
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        console.log("Window resized."); // Log: Confirm resize handling
+    }
+
+
+    // --- Start the application ---
+    init();
+
+
 </script>
 </body>
 </html>
+
+
+
+**How to Use This Code:**
+
+ **Verify Paths:** Double-check that the paths to `three.min.js`, `OrbitControls.js`, `OBJLoader.js`, and especially `assets/mesh.obj` are correct relative to where you save this HTML file. If you downloaded the libraries, make sure they are in a `js` subfolder. If the `mesh.obj` is in `assets`, ensure that folder exists at the same level as your HTML file.
+ **Open the HTML file in your browser.**
+ **Open the Developer Console (F12).** Look carefully at the messages in the "Console" tab.
+    * You should see logs like "Initializing scene...", "Renderer created.", "Attempting to load OBJ model...".
+    * If the model loads, you'll see "OBJ Model Loaded Successfully..." and "Model added to the scene.".
+    * **If loading fails, you will see a red error message starting with "An error happened during OBJ loading:". This error message is key!** It might indicate a 404 Not Found (wrong path) or a problem parsing the file.
+    * Also check the "Network" tab again to confirm if `mesh.obj` is listed and whether its status is 200 (OK) or 404 (Not Found).
+
+
+
